@@ -1,10 +1,7 @@
-import 'dart:developer' as dev;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
-/// Vimeo video player with customizable controls and event callbacks using the InAppWebView
-class VimeoVideoPlayer extends StatelessWidget {
+class VimeoVideoPlayer extends StatefulWidget {
   /// Defines the vimeo video ID to be played
   ///
   /// [videoId] is required and cannot be empty
@@ -70,23 +67,20 @@ class VimeoVideoPlayer extends StatelessWidget {
   final Function(InAppWebViewController controller)? onInAppWebViewCreated;
 
   /// Defines a callback function triggered when the WebView starts to load an url
-  final Function(
-    InAppWebViewController controller,
-    WebUri? url,
-  )? onInAppWebViewLoadStart;
+  final Function(InAppWebViewController controller, WebUri? url)?
+  onInAppWebViewLoadStart;
 
   /// Defines a callback function triggered when the WebView finishes loading an url
-  final Function(
-    InAppWebViewController controller,
-    WebUri? url,
-  )? onInAppWebViewLoadStop;
+  final Function(InAppWebViewController controller, WebUri? url)?
+  onInAppWebViewLoadStop;
 
   /// Defines a callback function triggered when the WebView encounters an error loading a request
   final Function(
     InAppWebViewController controller,
     WebResourceRequest request,
     WebResourceError error,
-  )? onInAppWebViewReceivedError;
+  )?
+  onInAppWebViewReceivedError;
 
   VimeoVideoPlayer({
     super.key,
@@ -111,33 +105,48 @@ class VimeoVideoPlayer extends StatelessWidget {
   }) : assert(videoId.isNotEmpty, 'videoId cannot be empty!');
 
   @override
+  _VimeoVideoPlayerState createState() => _VimeoVideoPlayerState();
+}
+
+class _VimeoVideoPlayerState extends State<VimeoVideoPlayer> {
+  InAppWebViewController? webViewController;
+
+  @override
   Widget build(BuildContext context) {
-    return InAppWebView(
-      initialSettings: InAppWebViewSettings(
-        mediaPlaybackRequiresUserGesture: false,
-        allowsInlineMediaPlayback: true,
-        useHybridComposition: true,
+    return Scaffold(
+      body: InAppWebView(
+        initialData: InAppWebViewInitialData(
+          data: _buildHtmlContent(widget.videoId),
+        ),
+        initialSettings: InAppWebViewSettings(
+          mediaPlaybackRequiresUserGesture: false,
+          allowsInlineMediaPlayback: true,
+          useHybridComposition: true,
+          javaScriptEnabled: true,
+        ),
+        onWebViewCreated: (controller) {
+          webViewController = controller;
+
+          // Handle JavaScript callbacks
+          controller.addJavaScriptHandler(
+            handlerName: 'onVimeoEvent',
+            callback: (args) {
+              String event = args.isNotEmpty ? args[0].toString() : "unknown";
+              debugPrint("Vimeo Event: $event");
+
+              if (event == "play") widget.onPlay?.call();
+              if (event == "pause") widget.onPause?.call();
+              if (event == "ready") widget.onReady?.call();
+              if (event == "seek") widget.onSeek?.call();
+              if (event == "finish") widget.onFinish?.call();
+            },
+          );
+        },
       ),
-      initialData: InAppWebViewInitialData(
-        data: _buildHtmlContent(),
-        baseUrl: WebUri("https://player.vimeo.com"),
-      ),
-      onConsoleMessage: (controller, consoleMessage) {
-        final message = consoleMessage.message;
-        dev.log('onConsoleMessage :: $message');
-        if (message.startsWith('vimeo:')) {
-          _manageVimeoPlayerEvent(message.substring(6));
-        }
-      },
-      onWebViewCreated: onInAppWebViewCreated,
-      onLoadStart: onInAppWebViewLoadStart,
-      onLoadStop: onInAppWebViewLoadStop,
-      onReceivedError: onInAppWebViewReceivedError,
     );
   }
 
-  /// Builds the HTML content for the vimeo player
-  String _buildHtmlContent() {
+  String _buildHtmlContent(String videoId) {
     return '''
     <!DOCTYPE html>
     <html>
@@ -146,7 +155,7 @@ class VimeoVideoPlayer extends StatelessWidget {
           body {
             margin: 0;
             padding: 0;
-            background-color: ${_colorToHex(backgroundColor)};
+            background-color: ${_colorToHex(Colors.black)};
           }
           .video-container {
             position: relative;
@@ -162,65 +171,42 @@ class VimeoVideoPlayer extends StatelessWidget {
           }
         </style>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <script src="https://player.vimeo.com/api/player.js"></script>
-      </head>
-      <body>
-        <div class="video-container">
-          <iframe 
-            id="player"
-            src="${_buildIframeUrl()}"
-            frameborder="0"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowfullscreen 
+      <script src="https://player.vimeo.com/api/player.js"></script>
+    </head>
+    <body>
+      <iframe id="vimeoPlayer" src="https://player.vimeo.com/video/$videoId?autoplay=0" 
+      frameborder="0" allow="autoplay; fullscreen; picture-in-picture"allowfullscreen 
             webkitallowfullscreen 
             mozallowfullscreen>
-          </iframe>
-        </div>
-        <script>
-          const player = new Vimeo.Player('player');
-          player.ready().then(() => console.log('vimeo:onReady'));
-          player.on('play', () => console.log('vimeo:onPlay'));
-          player.on('pause', () => console.log('vimeo:onPause'));
-          player.on('ended', () => console.log('vimeo:onFinish'));
-          player.on('seeked', () => console.log('vimeo:onSeek'));
-        </script>
-      </body>
+      </iframe>
+
+      <script>
+        var iframe = document.getElementById('vimeoPlayer');
+        var player = new Vimeo.Player(iframe);
+
+        player.on('play', function() {
+          window.flutter_inappwebview.callHandler('onVimeoEvent', 'play');
+        });
+
+        player.on('pause', function() {
+          window.flutter_inappwebview.callHandler('onVimeoEvent', 'pause');
+        });
+
+        player.on('loaded', function() {
+          window.flutter_inappwebview.callHandler('onVimeoEvent', 'ready');
+        });
+
+        player.on('seeked', function() {
+          window.flutter_inappwebview.callHandler('onVimeoEvent', 'seek');
+        });
+
+        player.on('ended', function() {
+          window.flutter_inappwebview.callHandler('onVimeoEvent', 'finish');
+        });
+      </script>
+    </body>
     </html>
     ''';
-  }
-
-  /// Builds the iframe URL
-  String _buildIframeUrl() {
-    return 'https://player.vimeo.com/video/$videoId?'
-        'autoplay=$isAutoPlay'
-        '&loop=$isLooping'
-        '&muted=$isMuted'
-        '&title=$showTitle'
-        '&byline=$showByline'
-        '&controls=$showControls'
-        '&dnt=$enableDNT';
-  }
-
-  /// Manage vimeo player events received from the WebView
-  void _manageVimeoPlayerEvent(String event) {
-    debugPrint('Vimeo event: $event');
-    switch (event) {
-      case 'onReady':
-        onReady?.call();
-        break;
-      case 'onPlay':
-        onPlay?.call();
-        break;
-      case 'onPause':
-        onPause?.call();
-        break;
-      case 'onFinish':
-        onFinish?.call();
-        break;
-      case 'onSeek':
-        onSeek?.call();
-        break;
-    }
   }
 
   /// Converts Color to a hexadecimal string
