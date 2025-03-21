@@ -68,19 +68,18 @@ class VimeoVideoPlayer extends StatefulWidget {
 
   /// Defines a callback function triggered when the WebView starts to load an url
   final Function(InAppWebViewController controller, WebUri? url)?
-  onInAppWebViewLoadStart;
+      onInAppWebViewLoadStart;
 
   /// Defines a callback function triggered when the WebView finishes loading an url
   final Function(InAppWebViewController controller, WebUri? url)?
-  onInAppWebViewLoadStop;
+      onInAppWebViewLoadStop;
 
   /// Defines a callback function triggered when the WebView encounters an error loading a request
   final Function(
     InAppWebViewController controller,
     WebResourceRequest request,
     WebResourceError error,
-  )?
-  onInAppWebViewReceivedError;
+  )? onInAppWebViewReceivedError;
 
   VimeoVideoPlayer({
     super.key,
@@ -174,7 +173,7 @@ class _VimeoVideoPlayerState extends State<VimeoVideoPlayer> {
       <script src="https://player.vimeo.com/api/player.js"></script>
     </head>
     <body>
-      <iframe id="vimeoPlayer" src="https://player.vimeo.com/video/$videoId?autoplay=0" 
+      <iframe id="vimeoPlayer" src="${_buildIframeUrl()}" 
       frameborder="0" allow="autoplay; fullscreen; picture-in-picture"allowfullscreen 
             webkitallowfullscreen 
             mozallowfullscreen>
@@ -207,6 +206,17 @@ class _VimeoVideoPlayerState extends State<VimeoVideoPlayer> {
     </body>
     </html>
     ''';
+  }
+
+  String _buildIframeUrl() {
+    return 'https://player.vimeo.com/video/${widget.videoId}?'
+        'autoplay=${widget.isAutoPlay}'
+        '&loop=${widget.isLooping}'
+        '&muted=${widget.isMuted}'
+        '&title=${widget.showTitle}'
+        '&byline=${widget.showByline}'
+        '&controls=${widget.showControls}'
+        '&dnt=${widget.enableDNT}';
   }
 
   /// Converts Color to a hexadecimal string
