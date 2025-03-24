@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class VimeoVideoPlayer extends StatefulWidget {
@@ -31,6 +32,16 @@ class VimeoVideoPlayer extends StatefulWidget {
   ///
   /// Default value: [false]
   final bool showByline;
+
+  /// Used to display the vimeo logo
+  ///
+  /// Default value: [false]
+  final bool badge;
+
+  /// Used to display the profile avatar
+  ///
+  /// Default value: [false]
+  final bool portrait;
 
   /// Used to display the video playback controls
   ///
@@ -91,6 +102,8 @@ class VimeoVideoPlayer extends StatefulWidget {
     this.showByline = false,
     this.showControls = true,
     this.enableDNT = true,
+    this.portrait = false,
+    this.badge = false,
     this.backgroundColor = Colors.black,
     this.onReady,
     this.onPlay,
@@ -140,6 +153,37 @@ class _VimeoVideoPlayerState extends State<VimeoVideoPlayer> {
               if (event == "finish") widget.onFinish?.call();
             },
           );
+
+          controller.addJavaScriptHandler(
+            handlerName: 'onEnterFullscreen',
+            callback: (args) {
+              SystemChrome.setPreferredOrientations([
+                DeviceOrientation.landscapeRight,
+                DeviceOrientation.landscapeLeft,
+              ]);
+            },
+          );
+
+          controller.addJavaScriptHandler(
+            handlerName: 'onExitFullscreen',
+            callback: (args) {
+              SystemChrome.setPreferredOrientations([
+                DeviceOrientation.portraitUp,
+                DeviceOrientation.portraitDown,
+              ]);
+            },
+          );
+        },
+        onLoadStop: (controller, url) {
+          controller.evaluateJavascript(source: """
+                    document.addEventListener('fullscreenchange', function() {
+                      if (document.fullscreenElement) {
+                        window.flutter_inappwebview.callHandler('onEnterFullscreen');
+                      } else {
+                        window.flutter_inappwebview.callHandler('onExitFullscreen');
+                      }
+                    });
+                  """);
         },
       ),
     );
@@ -215,6 +259,8 @@ class _VimeoVideoPlayerState extends State<VimeoVideoPlayer> {
         '&muted=${widget.isMuted}'
         '&title=${widget.showTitle}'
         '&byline=${widget.showByline}'
+        '&portrait=${widget.portrait}'
+        '&badge=${widget.badge}'
         '&controls=${widget.showControls}'
         '&dnt=${widget.enableDNT}';
   }
